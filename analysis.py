@@ -3,17 +3,28 @@ import numpy as np
 import seaborn as sns
 plt = sns.plt
 import json
-
-with open('sensor_data.json') as f:
+import flash
+with open('sensor_data_2.json') as f:
     sensor_data = json.load(f)
-df = pd.DataFrame.from_dict(sensor_data)
-df['g_z'] = df['g'].str.get(2)
-
-
+df = flash.to_df(sensor_data)
 std_cutoff = 0.5
-window_size = 10
+window_size = 5
 
 gz = df['g_z'].rolling(window=window_size).mean()
 gz_bin = 1.0 * (gz > std_cutoff * gz.std()) - (gz < -std_cutoff * gz.std())
 gz_diff = gz_bin.diff().fillna(False)
 
+def rotate(x, y, degree):
+    return (x * np.cos(degree) - y * np.sin(degree), x * np.sin(degree) + y * np.cos(degree))
+
+xs, ys = ([], [])
+(x, y) = (0, 0)
+(dx, dy) = (0.2, 0)
+for gz in df['g_z'].dropna():
+    (dx, dy) = rotate(dx, dy, gz / 20000)
+    x += 0.2 * dx
+    y += 0.2 * dy
+    xs.append(x)
+    ys.append(y)
+
+plt.plot(xs, ys)

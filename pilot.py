@@ -12,15 +12,12 @@ powerValue = 120
 client = Client(config['TEAM_NAME'], config['ACCESS_CODE'])
 RABBIT_HOST = config['RABBIT_HOST']
 
-sensor_data = []
-
 msgs = []
 def receive(msg):
     msgs.append(msg)
 
-
-firstRound = False
 def onRaceStart(msg):
+    print('race started')
     receive(msg)
     client.powerControl(powerValue)
 
@@ -47,8 +44,8 @@ def onRaceStop(msg):
 from flash import Flash
 flash_pilot = Flash(client)
 
-client.onRaceStart(onRaceStart)
-client.onVelocity(onVelocity)
+client.onRaceStart(flash_pilot.on_race_start)
+client.onVelocity(flash_pilot.on_velocity)
 client.onSensor(flash_pilot.on_sensor)
 client.onPenalty(onPenalty)
 client.onRoundPassed(flash_pilot.on_round_passed)
@@ -58,5 +55,5 @@ client.connect(RABBIT_HOST)
 client.announce()
 
 import json
-with open('sensor_data.json', 'w') as f:
-    json.dump(sensor_data, f)
+with open('other_msgs.json', 'w') as f:
+    json.dump(msgs, f)

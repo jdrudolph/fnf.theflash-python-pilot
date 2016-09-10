@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 
 class Flash:
@@ -10,6 +11,10 @@ class Flash:
         self.window_size = 0
         self.gz_std = 0
 
+        self._last_gate_time = float('NaN')
+        self._section_time = float('NaN')
+        self._velocity = float('NaN')
+
     def on_sensor(self, msg):
         if (self._laps <= 1):
             self._warmup(msg)
@@ -20,17 +25,29 @@ class Flash:
         print('round passed')
         self._laps += 1
         self.gz_std = to_df(self.sensor_data)['g_z'].std()
+        with open('sensor_data_{}.json'.format(self._laps), 'w') as f:
+            json.dump(self.sensor_data, f)
+
+    def on_velocity(self, msg):
+        self._velocity = msg['velocity']
+        new_gate_time = msg['timeStamp']
+        self._section_time = new_gate_time - self._last_gate_time
+        self._last_gate_time = new_gate_time
+
+    def on_race_start(self, msg):
+        print('start race')
 
     def _warmup(self, msg):
+        msg['v'] = self._velocity
+        msg['section_time'] = self._section_time
+        self._section_time = float('NaN')
         self.sensor_data.append(msg)
-        self._client.powerControl(80)
+        self._client.powerControl(120)
 
     def _mopsgeschwindigkeit(self, msg):
         gz = msg['g'][2] 
         is_corner = gz > self.gz_std or gz < -self.gz_std
-        power = 40 if is_corner else 80
-        if is_corner:
-            print('corner!')
+        power = 140 if is_corner else 120
         self._client.powerControl(power)
 
 def to_df(sensor_data):
