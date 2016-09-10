@@ -41,8 +41,10 @@ def onRaceStop(msg):
     receive(msg)
     client.disconnect()
 
-from flash import Flash
-flash_pilot = Flash(client)
+import flash
+from imp import reload
+reload(flash)
+flash_pilot = flash.Flash(client)
 
 client.onRaceStart(flash_pilot.on_race_start)
 client.onVelocity(flash_pilot.on_velocity)
