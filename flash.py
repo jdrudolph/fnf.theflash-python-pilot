@@ -1,62 +1,81 @@
+import os
+import sys
 import json
+import time
 import pandas as pd
 import numpy as np
 
+from collections import defaultdict
+
 class Flash:
-    def __init__(self, client, laps=0):
+    def __init__(self, client):
         self._client = client
-        self._laps = laps
+        self._laps = 0
+
+        self.msgs = defaultdict(lambda : [])
         
-        self.sensor_data = []
-        
-        self.window_size = 0
-        self.gz_std = 0
+        self.extreme = 300.0
 
-        self._last_gate_time = float('NaN')
-        self._section_time = float('NaN')
-        self._velocity = float('NaN')
+        self.power = 120
 
-        self._all_gz = None # set after warmup
-        self._last_gz = None # set after warmup
+        self.memory = []
+        self._remove_in_beginning = 50
 
-        self.n_points_tracked = 150
+    def receive(self, msg, event):
+        self.msgs[event].append(msg)
 
     def on_sensor(self, msg):
+        self.receive(msg, 'sensor')
+        last = 'N'
+        if len(self.memory) > 0:
+            last = self.memory[-1]
+        gz = msg['g'][2]
+        if (abs(gz) > self.extreme):
+            self.extreme = gz
+        if (gz > 0.25 * self.extreme):
+            if (last != 'R'):
+                sys.stdout.write('R')
+                self.memory.append('R')
+        elif (gz < -0.25 * self.extreme):
+            if (last != 'L'):
+                sys.stdout.write('L')
+                self.memory.append('L')
+        else:
+            if (last != 'G'):
+                sys.stdout.write('G')
+                self.memory.append('G')
+        sys.stdout.flush()
+        self._warmup(msg)
+        """
         if (self._laps <= 1):
             self._warmup(msg)
         if (self._laps > 1):
             self._flashgeschwindigkeit(msg)
+        """
 
     def on_round_passed(self, msg):
-        print('round passed')
+        self.receive(msg, 'round')
         self._laps += 1
-        if self._laps > 1:
-            df = to_df(self.sensor_data)
-            self.sensor_data = []
-            self.gz_std = df['g_z'].std()
-            self._all_gz = 2 * (df['g_z'] > self.gz_std) - 2 * (df['g_z'] < -self.gz_std)
-            self._all_gz_smooth = pd.Series(df['g_z']).rolling(window=5).mean().values
-            if (self._last_gz is None):
-                self._last_gz = self._all_gz_smooth[-self.n_points_tracked:]
-            print('round calc finished')
-            with open('sensor_data_{}.json'.format(self._laps), 'w') as f:
-                json.dump(self.sensor_data, f)
 
     def on_velocity(self, msg):
-        self._velocity = msg['velocity']
-        new_gate_time = msg['timeStamp']
-        self._section_time = new_gate_time - self._last_gate_time
-        self._last_gate_time = new_gate_time
+        self.power += 1
+        self.receive(msg, 'velocity')
 
     def on_race_start(self, msg):
-        print('start race')
+        self.receive(msg, 'start')
+
+    def on_race_stop(self, msg):
+        self.receive(msg, 'stop')
+        self._client.disconnect()
+        with open(os.path.join('data','{}.json'.format(time.strftime('%Y-%m-%d-%H-%M'))), 'w') as f:
+            json.dump(self.msgs, f)
+   
+    def on_penalty(self, msg):
+        self.receive(msg, 'penalty')
+        self._client.powerControl(100)
 
     def _warmup(self, msg):
-        msg['v'] = self._velocity
-        msg['section_time'] = self._section_time
-        self._section_time = float('NaN')
-        self.sensor_data.append(msg)
-        self._client.powerControl(120)
+        self._client.powerControl(self.power)
 
     def _mopsgeschwindigkeit(self, msg):
         gz = msg['g'][2] 
@@ -64,6 +83,7 @@ class Flash:
         power = 140 if is_corner else 120
         self._client.powerControl(power)
 
+    """
     def _flashgeschwindigkeit(self, msg):
         self.sensor_data.append(msg)
         gz = msg['g'][2]
@@ -71,13 +91,12 @@ class Flash:
         all_gz = self._all_gz_smooth
         n = self.n_points_tracked
         step = 1
-        ccs = [np.corrcoef(self._last_gz, 
-            np.take(all_gz, range(0+k, n+k), mode='wrap'))[1,0]
+        ccs = [np.corrcoef(self._last_gz, np.take(all_gz, range(0+k, n+k), mode='wrap'))[1,0]
         for k in range(0, len(all_gz), step)]
         self._point_in_track = np.nanargmax(ccs)
         if np.nanmax(ccs) > 0.8:
             print(self._point_in_track)
-        
+    """  
 
 def to_df(sensor_data):
     df = pd.DataFrame(sensor_data)
