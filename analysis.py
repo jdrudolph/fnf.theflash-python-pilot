@@ -4,8 +4,9 @@ import seaborn as sns
 plt = sns.plt
 import json
 import flash
-with open('data/const_speed.json') as f:
-    sensor_data = json.load(f)['sensor']
+with open('data/2016-09-11-07-56.json') as f:
+    json_data = json.load(f)
+sensor_data = json_data['sensor']
 df = flash.to_df(sensor_data)
 std_cutoff = 0.5
 window_size = 5
@@ -13,6 +14,8 @@ window_size = 5
 gz = df['g_z'].rolling(window=window_size).mean()
 gz_bin = 1.0 * (gz > std_cutoff * gz.std()) - (gz < -std_cutoff * gz.std())
 gz_diff = gz_bin.diff().fillna(False)
+
+rounds = pd.DataFrame(json_data['round'])
 
 """
 def rotate(x, y, degree):

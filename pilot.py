@@ -1,14 +1,20 @@
 from client import Client
 import os
 
-config = {
+configs = {
+    'local' : {
         'TEAM_NAME' : 'theflash',
         'ACCESS_CODE' : 'züwermepa',
         'RABBIT_HOST' : 'localhost'
+        },
+    'remote' : {
+        'TEAM_NAME' : 'theflash',
+        'ACCESS_CODE' : 'teifarseudo', #'züwermepa',#
+        'RABBIT_HOST' : '192.168.1.163'# 'localhost'
         }
-
+    }
+config = configs['remote']
  
-powerValue = 120
 client = Client(config['TEAM_NAME'], config['ACCESS_CODE'])
 RABBIT_HOST = config['RABBIT_HOST']
 
